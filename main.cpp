@@ -201,7 +201,7 @@ void* ARPInfection_regular(void *pinfo)
 			info.myMac, info.srcMac, 2, "Regular");
 		SendPacket(handle, info.src_ip, info.dst_ip,
 			info.myMac, info.dstMac, 2, "Regular");
-		sleep(10);
+		sleep(60);
 	}
 
 	pcap_close(handle);
