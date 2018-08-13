@@ -177,7 +177,7 @@ void* ARPInfection_regular(void *pinfo)
 	{
 		SendPacket(handle, info.dst_ip, info.src_ip, info.myMac, info.srcMac, 2, "Regular");
 		SendPacket(handle, info.src_ip, info.dst_ip, info.myMac, info.dstMac, 2, "Regular");
-		sleep(10);
+		sleep(30);
 	}
 
 	pcap_close(handle);
@@ -260,11 +260,7 @@ void* ARPInfection_irregular(void *ainfo)
     			memcpy(eth_h->ether_dhost, info->all_srcMac[i], 6);
 			}
 		}
-
-		if(pcap_sendpacket(handle, packet, packet_size))
-			printf("Modified Packet Relay Success!! :-)\n");
-		else
-			printf("Modified Packet Relay Failed!! :-(!!\n");
+		pcap_sendpacket(handle, packet, packet_size);
     }
 }
 
